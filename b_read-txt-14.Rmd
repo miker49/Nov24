@@ -1,0 +1,443 @@
+---
+title: "B-ai-script-read-txt-file-14.Rmd"
+author: "Michael Rulison"
+date: "`r format(Sys.time(), '%Y %m %d %X')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide # hide/show
+comment: CODE is in marked chunks, 
+  MARKDOWN is in color (brown? or amber?)
+# color is blue
+#theme: united  # color is  red
+# bookdown::html_document2: default 
+# bibliography: bibliography.bib 
+---
+
+```{r, setup, include=FALSE, results='show', message=FALSE, tidy=TRUE }
+knitr::opts_chunk$set(echo = TRUE, time_it = TRUE)
+#> https://bookdown.org/yihui/rmarkdown-cookbook/opts-render.html
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax
+for authoring HTML, PDF, and MS Word documents. For more details on
+using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that
+includes both content as well as the output of any embedded R code
+chunks within the document. You can embed an R code chunk like this:
+
+Note that the `echo = FALSE` parameter was added to the code chunk to
+prevent printing of the R code that generated the plot.
+
+# 1. SETUP
+
+```{r, setup2, include = TRUE}
+library(knitr)
+library(flextable)
+#library(readxl)
+library(writexl) # to export kwics to spreadsheet
+library(dplyr)
+library(stringi)
+library(stringr)
+library(here)  # used to specify save location
+library(tm)  # Text Managment
+library(quanteda)  # source of KWIC code
+#library(ggplot2)
+library(magrittr)
+#library(lubridate)
+library(SnowballC)  # from AI-generated code
+library(tidyverse)
+```
+
+## 2.1 Master Parameters for Knitr
+
+```{r, setup3, include = TRUE}
+knitr::opts_chunk$set(
+  eval = T,
+  echo = TRUE,
+  error = T,
+  message = FALSE,
+  warning = T,
+  include = TRUE,
+  tidy = T,
+  cache = FALSE,
+  fig.width = 6,
+  comment = "#>",
+  results = "asis"
+)
+```
+
+```{r, setup4, include = TRUE}
+```
+
+## 2.2 Paths - Set file paths
+
+```{r, paths}
+wdbase   <- "D:/dox/projects/Bour/"
+wddata   <- "D:/dox/projects/Bour/01data-In/"
+wdscript <- "D:/dox/projects/Bour/03Code/"
+wdrmd    <- "D:/dox/projects/Bour/05report/"
+data_dir <- "D:/dox/projects/Bour/01data-In/"
+# end of paths
+```
+
+# 2. PARAMETERS
+
+### 2.2.1 LISTING OF FUNCTIONS
+```{r}
+#  ls() ????makes the list??????????
+```
+chapters corp flxtbl listtexts mergit modify_texts rdchr readfile rename_file results split_texts storage
+
+### 2.2.2 Logicals & NUMERICS
+### for data subset to use for debugging; else a larger or complete dataset.
+```{r}
+isexample <- T 
+```
+
+## numerics
+```{r}
+char_limit <- 200000 # used in reading text strings.
+```
+### file.info(fileName)$size)  # more accurate but may not read the data
+
+## 2.3.1. Outputs
+
+### rescount, matrix of character counts on each chapter part, with columns for the nature of the count, ranging from raw, as read in, to corpus after various transformations have been made. These counts indicate the amount of data removed at various stages of transformation.
+
+### individual text files after wrangling
+
+### further: analysing these files with concordancing in KWIC files. This will receive more explanation in a subsequent report on the Bouricius texts.
+
+# 3. FORMULAS - FOR PROCESSING ONE FILE
+
+#---------FUNCTION SPACE---------------
+
+## 3.1 make ldf with file_names
+
+```{r, listtexts}
+
+ldf <- list.files(pattern = ".*.txt", path = data_dir) # WORKS!
+
+# end of file_names
+```
+
+## 1. next: set for example run
+## 2. next: set for full run 
+
+```{r example}
+if(isexample == T) { file_names <- ldf[1]
+} else { 
+file_names <- ldf }
+  # ok on 2024-10-10
+```
+
+```{r, storage1}
+stor_func <- function(file_names) {
+#rm(rescount) # function name should <> output name
+rescount <<- matrix(0, nrow = length(91), ncol = 7) # 91 or file_names
+colnames(rescount) <- c("chapter", "raw_input", "no_extra_spaces", "filled_lines", "", "corpus", "comments")
+# return(rescount)
+} # works, 2024-10-03
+```
+
+4.1.5  READ FILES IN and process one at a time
+ 
+```{r, readtext}
+  for (i in seq_along(file_names)) {
+    txtRaw[i] <- readChar(paste0(wddata, file_names), char_limit, useBytes = FALSE)
+
+make_counts(txtRaw[i])
+
+#list_cnts <- paste0("txtRaw[i] = ", (stri_numbytes(txtRaw[i])))
+
+    # remove line breaks
+  txtClean[i] <- str_replace_all(txtRaw[i], "\r?\n", " ")
+
+make_counts(txtClean[i])  
+
+    # remove superfluous white spaces
+txtClean[i] <- stri_wrap(txtClean[i], whitespace_only = T, normalize = T) 
+
+make_counts(txtClean[i])
+
+#```{r, splitting}  
+  txtSplit[i] <- stri_split_fixed(txtClean[i], "Leave a comment", simplify = T)
+
+make_counts(txtSplit[i])
+
+# NOW ADD CHAPTER NAME & STORE IT AS A CHAPTER FILE
+txtSplit[i] <- paste0(chap_names[i], txtSplit[i])
+}
+```
+object.size(txtRaw[i])
+object.size(txtClean[i])
+object.size(txtSplit[i])
+
+```{r counts}
+make_counts <- function(infyl) {
+list_cnts <- paste(infyl, " = ", stri_numbytes(infyl), sep=" ")
+list_cnts
+stri_stats_general(infyl)
+}
+```
+## chap_func makes chap_nums, chap_names, amd chap_tytls 
+
+```{r, chapnames}
+chap_func <- function(file_names) {
+	chap_nums <-sub("^.*?(\\d{1,2})\\.(\\d{1,2}).*", "\\1.\\2", file_names)
+  
+	### Create file names; catenate "Chap_" and the chapter number
+	chap_names <- paste0("Chap_", chap_nums)
+  
+	sapply(txtSplit, prepend)
+	
+prepend <- function(chap_names, txtSplit) {
+	  	### Prepend chapvar to file text vector
+	#chaps <- paste(chap_names, file_names, sep = " == ") # works 2024-09-28
+	chaps <- paste(chap_names, txtSplit, sep = " == ") #
+return(chaps)
+  chaps # display it
+	}
+
+    # rescount[length(chap_names), "chapter"] <- chap_names   ### Yup, this works 2024-10-12 
+}
+```
+# END OF chaps function 
+```
+
+
+
+# NOW IT IS TIME TO MOVE TO ANALYSIS !!!!!!!!!
+
+
+
+
+# DUPLICATE CODE FOR READING RIGHT BELOW:
+#txtRaw <- as.character (sapply(paste0(wddata, file_names), readLines   )) 
+
+ # Create file names; catenate "Chap_" and the chapter number
+  chap_names <- paste0("Chap_", chap_nums, ' == ') # with separator
+ 
+txtRaw[i] <- paste0(chap_names[i], txtRaw[i])
+ # works!
+ glimpse(txtRaw)
+summary(txtRaw)
+# head(txtraw[2])  # for example
+list_cnts <- (stri_numbytes(txtRaw))
+```
+
+
+# 3.3 Split File Function to split text into corpus and comments
+## to be done chapter by chapter before they are combined
+
+  # Create a corpus
+  corpus <- Corpus(VectorSource(text))
+  
+  # Split the text at the phrase "Leave a comment"
+
+```{r, splitting}  
+  split_text <- stri_split_fixed(text, "Leave a comment", simplify = T)
+# redo
+zfile_name <- raw_data
+  
+  # Loop Process each part of the split text:
+#  for (i in seq_along(split_text)) {
+    part  <- split_text[i]
+
+    ## NOT NAMING 3 DIFFERENT FILES:
+    # Create a new file name for each part:
+    output_file[i] <- paste0("processed_", i, "_", zfile_name)
+  
+    # Write the processed part to a new file
+    writeLines(part, output_file)
+
+
+part
+# List all text files in the directory
+zfile_list <- list.files(pattern = "*.txt")
+
+# Apply the function to each file in the list
+sapply(zfile_list, process_file)
+
+```
+
+In this example: - `readLines(file_name)` reads the content of the
+file. - `paste(content, collapse = " ")` combines all lines into a
+single string. - `Corpus(VectorSource(text))` creates a corpus from the
+text. - `stri_split_fixed(text, "Leave a comment", simplify = TRUE)`
+splits the text at the phrase "Leave a comment". - The loop processes
+each part of the split text and writes it to a new file.
+
+
+```{r split2}
+pattern <- "This is the corpus. Leave a comment here." 
+txtSplit <- str_split(txtRaw, pattern, n = 2, simplify = FALSE)
+```
+stri_stats_general(txtSplit[4] )    #txtSplit)
+
+```
+(txtSplit[4])
+#glimpse(txtSplit)
+   ## Process the split result (corpus and comments)
+```
+
+```{r split2.1} # not working here!!!
+corpus_part <- txtSplit$corpus # 1st part, <"Leave a comment"
+comment_part <- txtSplit$comment # 2nd part, >"Leave a comment"
+
+   # Record the count for each part
+  rescount[ "before_comments"] <- stri_numbytes(corpus_part)
+  rescount[ "after_comments"] <- stri_numbytes(comment_part)
+
+cat(as.character(txtSplit))
+cat(corpus_part)
+cat(comment_part)
+```
+
+## =========================================================
+
+# 3. **MODI_TEXT STATEMENTS**
+
+
+
+list_cnts <- c(list_cnts, stri_numbytes(txtClean))
+glimpse(txtClean) 
+stri_stats_general(txtClean)
+stri_numbytes(txtRaw)
+
+## 3.1 **Remove superfluous white spaces**
+summary(txtClean)
+txtClean2 <<- stringr::str_squish(txtClean)   
+list_cnts <- c(list_cnts, stri_numbytes(txtClean2))
+ 
+glimpse(list_cnts)
+```
+## 3.2 - **Identify and handle placeholders**:
+
+```{r split3}
+txtClean3 <- str_replace_all(txtClean2, "Leave a comment here", "[PLACEHOLDER]")
+list_cnts <- c(list_cnts, stri_numbytes(txtClean3))
+```
+
+# ===========================================
+# 4. **Tokenize the text**:
+
+```{r tokenize}
+  tokens <- unlist(strsplit(txtClean3, " ")) 
+list_cnts <-  c(list_cnts, stri_numbytes(tokens))
+```
+
+```{r peel list_cnts}
+list_cnts2 <- list_cnts[1:20]
+
+FirstFive.csv <- paste0(wdbase, tokens)
+   write.csv(tokens,  'FirstFive.csv')
+ 
+# Write the files to csv in the same folder                      
+ #write.csv(FirstFive.csv, file = sub(pattern = "\\.txt$", replacement = ".csv", x = x))
+```
+# ===========================================
+
+# 5. **Further processing (optional)**:
+
+## 5.1 - **Remove stopwords**:
+
+# 4. FORMULAS - SAPPLY - MULTI-FILE ==========
+
+##+++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+## 4.2 Text Modifications Function
+
+### Example of modifying text and updating the results matrix
+
+```{r, moditext1}
+infyl <- modify_text(infyl, rescount)
+```
+
+### 4.3.1 MODIFY RAW DATA
+
+```{r, moditext2}
+infyl <- sapply(file_names, modify_text, txtRaw, rescount)
+```
+
+## 4.4 TEXT SPLIT
+
+## 4.4.1 WITH SAPPLY SPLIT DATA INTO CORPUS AND COMMENTS
+
+```{r, split1}
+sapply(txtRaw , split_text) #infyl
+```
+```{r}
+split_text <- function(txtRaw) {
+txtSplit <- (split_text("This is the corpus. Leave a comment here."))
+}
+```
+pattern <- as.character(" Leave a comment.")
+## txtRaw2
+corpus <- stri_split_regex(as.character(txtClean2), pattern, omit_empty = FALSE, simplify = FALSE)
+
+# corpus
+
+list_cnts <<-  c(list_cnts, stri_numbytes(corpus))
+
+#comment_part <- txtSplit$comment # 2nd part, >"Leave a comment"
+   # Record the count for each part
+```
+
+# xx SUPPORT FUNCTIONS
+
+```{r rename-func}
+rename_files <- function(merged_name, new_name) {
+  # Rename files using provided names   
+  file.rename(from = merged_name, to = new_name)   
+  return(new_name) 
+}
+```
+
+```{r mergit-func}
+mergit <- function(vector1, vector2) {
+  merged_vector <- sapply(1:length(vector1), function(i) paste(vector1[i], vector2[i]))
+  return(merged_vector)
+}
+```
+
+### list files -- ls()
+
+### Create variable, "file_list" that lists all files in folder for "lapply" to loop through
+
+```         
+filelist <- list.files(path = folder, pattern = "*.txt")
+```
+
+### list functions
+
+### list variables in global environment
+
+```         
+ls() # lists vars in global environment 
+```
+
+# 5. WRAPUP
+
+```{r wrapup}
+'https://benwhalley.github.io/just-enough-r/saving-and-exporting.html#use-csv'
+
+# to save files for later use:
+#saveRDS(massive.df, file="massive.RDS")
+#restored.massive.df <-  readRDS('massive.RDS')
+
+#sessioninfo::session_info() utils::sessionInfo()
+#better than prior line 
+session_info( pkgs = c("loaded", "attached", "installed")[1], include_base = FALSE, info = c("auto", "all", "platform", "packages", "python", "external"), dependencies = NA, to_file = FALSE )
+```
+
+# 6. EOF
+		
