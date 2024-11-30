@@ -1,0 +1,135 @@
+---
+title: "combined-ai-code-01.Rmd"
+author: "MvER"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax
+for authoring HTML, PDF, and MS Word documents. For more details on
+using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that
+includes both content as well as the output of any embedded R code
+chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+# summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to
+prevent printing of the R code that generated the plot.
+
+= = = = = = = = = Edge code:
+
+R code to:
+
+read a set of files as characters that originated on substack or email\
+split each file at a given phrase, return both parts\
+remove control characters like new line\
+remove extra whitespace\
+add a file name to each file\
+count size at each step.\
+================================
+
+Sure, I can help you with that! Here’s a step-by-step R script to
+achieve your goals:
+
+1.  **Read a set of files as characters**:
+2.  **Split each file at a given phrase**:
+3.  **Remove control characters like new line**:
+4.  **Remove extra whitespace**:
+5.  **Add a file name to each file**:
+6.  **Count size at each step**:
+
+``` r
+# Load necessary libraries
+library(stringr)
+library(dplyr)
+
+# Function to process files
+process_files <- function(file_paths, split_phrase) {
+  results <- list(file_paths)
+  
+  for (file_path in file_paths) {
+    # Read file as character
+    content <- readLines(file_path, warn = FALSE)
+    content <- paste(content, collapse = " ")
+    
+    # Split content at the given phrase
+    
+    parts <- str_split(content, split_phrase, simplify = TRUE)
+
+# Wrangle data
+
+    # Remove control characters like new line
+    parts <- gsub("[\\r\\n]", " ", parts)
+    
+    # Remove extra whitespace
+    parts <- str_squish(parts)
+    
+    # Add file name to each part
+    file_name <- basename(file_path)
+    parts <- paste("=====", file_name, parts, sep = ": ")
+    
+    # Count size at each step
+    size_original <- paste0("nchar of original  ", nchar(content))
+    size_split <- paste0("nchar of parts  ", nchar(parts))
+    
+    results[[file_name]] <- list(
+      original_size = size_original,
+      split_size = size_split,
+      parts = parts
+    )
+  }
+  
+  return(results)
+}
+
+# Example usage
+#file_paths <- list.files(path = "path/to/your/files", pattern = "*.txt", full.names = TRUE)
+file_paths <- list.files(path = wddata, pattern = "*.txt", full.names = TRUE)
+# above works
+
+#split_phrase <- 
+split_phrase <- "Leave a comment"
+
+results <- process_files(file_paths, split_phrase)
+
+# Print results
+print(results)
+```
+
+### Explanation:
+
+1.  **Reading Files**: The `readLines` function reads each file as a
+    character vector, and `paste` combines lines into a single string.
+2.  **Splitting Files**: The `str_split` function from the `stringr`
+    package splits the content at the specified phrase.
+3.  **Removing Control Characters**: The `gsub` function removes newline
+    and carriage return characters.
+4.  **Removing Extra Whitespace**: The `str_squish` function from the
+    `stringr` package removes extra whitespace.
+5.  **Adding File Name**: The `basename` function extracts the file
+    name, which is then prepended to each part.
+6.  **Counting Size**: The `nchar` function counts the number of
+    characters at each step.
+
+Feel free to adjust the paths and split phrase as needed. Let me know if
+you have any questions or need further assistance!
+
+EOF

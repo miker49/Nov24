@@ -1,0 +1,1340 @@
+---
+title: "B-kwic-code-03.Rmd"
+author: "MvER"
+date: "`r format(Sys.time(), '%Y %m %d %X')`"
+output:
+  html_document:
+    toc: true # color is blue
+    # theme: united  # color is red
+reference: "Output from GPT.4o edited by M.R. to be used with 'Concordancing with R' by 'Martin Schweinberger'"
+link-citations: yes
+# bookdown::html_document2: default
+bibliography: B_bib.bib
+---
+
+**Preparation and session set up** install packages
+
+```{r prep1, echo=T, eval = F}
+install.packages("quanteda")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("writexl")
+install.packages("here")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Now that the required packages are installed, activate them using the
+following code snippet:
+
+
+```{r prep2, message=F, warning=F, class.source='klippy'}
+# activate packages
+library(quanteda)
+library(dplyr)
+library(stringr)
+library(writexl)
+library(here)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+```{r, mrflxtbl}
+# code for pretty table output
+#		flextable(as.data.frame.character(dta))
+	flxtbl <- function(dta, capstr, hdrows) {
+		flextable(dta) %>%
+	  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+		flextable::theme_zebra() %>%
+		flextable::fontsize(size = 12) %>%
+		flextable::fontsize(size = 12, part = "header") %>%
+		flextable::align_text_col(align = "center") %>%
+		flextable::border_outer() %>%
+		flextable::set_caption(caption = capstr) %>%
+		head(hdrows)
+	}
+# call as: flxtbl(dta, capstr, hdrows) 
+```  	
+flxtbl(txtRawb, "test caption", 17)
+
+
+Preparations
+
+To change or reset defaults for flextable package
+
+```{r flexpreps}
+set_flextable_defaults(
+  font.family = "Arial",
+  font.size = 12,
+  text.align = "left"
+)
+
+init_flextable_defaults()
+```
+
+Introduction #introduction {.numbered}
+
+knitr::include_graphics("https://github.com/miker49/Bour/blob/680c4d733635356687c1bec2c73d636101c5e142/B_democ_image.jpeg")
+```
+
+
+### This tutorial introduces how to extract concordances and keyword-in-context (KWIC) displays with R using the `quanteda` package [@quanteda2018package].
+
+*CONCORDANCING TOOL* {.numbered}
+
+Concordancing is a fundamental tool in language sciences, involving the
+extraction of words from a given text or texts [@lindquist2009corpus5].
+Typically, these extractions are displayed through keyword-in-context
+displays (KWICs), where the search term, also referred to as the *node
+word*, is showcased within its surrounding context, comprising both
+preceding and following words. Concordancing serves as a cornerstone for
+textual analyses,often serving as the initial step towards more
+intricate examinations of language data [@stafanowitsch2020corpus].
+Their significance lies in their capacity to provide insights into how
+words or phrases are utilized, their frequency of occurrence, and the
+contexts in which they appear. By facilitating the examination of a word
+or phrase's contextual usage and offering frequency data, concordances
+empower researchers to delve into collocations or the collocational
+profiles of words and phrases \#[@stafanowitsch2020corpus 50-51].
+
+
+### Loading and Processing Text {.numbered}
+
+For this study, we will use text published by Terry Bouricius in
+Substack: "The Trouble With Elections: Why Everything We Thought We Knew About Democracy is Wrong".
+
+**Loading Text (from Bouricius texts)**
+
+To access the text within R, you can use the following code snippet model from LADAL,
+ensuring you have an active internet connection:
+
+```{r skwic1, echo = F, warning=F, message=F}
+#Load Alice''s Adventures in Wonderland text into R
+txtRaw <- readLines("https://www.gutenberg.org/files/11/11-0.txt")
+sumtxtrawAlice <- summary(txtRaw)
+```
+
+Load a Bouricius text
+
+```{r skwic2, echo = T, warning = F, message = F}
+both <- paste0(wddta, "bouricius-01.01.txt")
+txtRaw <- readLines(both)
+
+# summary object parms
+sumtxtrawBour <- summary(txtRaw)
+sumtextBour <- summary(text)
+```
+Flxtbl FUNCTION 
+```{r flxfunc}
+	flxtbl <- function(dta, capstr, hdrows) {
+		flextable(dta) %>%
+	  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+		flextable::theme_zebra() %>%
+		flextable::fontsize(size = 12) %>%
+		flextable::fontsize(size = 12, part = "header") %>%
+		flextable::align_text_col(align = "center") %>%
+		flextable::border_outer() %>%
+		flextable::set_caption(caption = capstr) %>%
+		head(hdrows)
+  	}
+# call it as follows:
+# flxtbl <- function(dta, capstr, hdrows) {
+```
+
+We can use this base file name, txtRaw, in the remainder of this .Rmd
+```{r skwic3, echo=T, message= F, warning= F, class.source='klippy'}
+# inspect data
+#txtRaw %>%
+text %>%
+#  as.data.frame() %>%
+  dplyr::filter(.  != "") %>%
+  head(45) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 25 non-empty lines of the example text.")  %>%
+  flextable::border_outer()
+```
+str(text)
+
+# Works up to this point on 17 Nov. =================================
+
+#**Data Preparation**
+
+ collapse lines into a single text
+ remove superfluous white spaces
+ remove everything before "Leave a comment"
+```{r skwic4, message=F, warning=F}
+text <- txtRaw %>%   
+  paste0(collapse = " ") %>%   
+  stringr::str_squish() %>%
+  stringr::str_remove("Leave a comment")
+
+summary(text)
+
+# Inspect 'text' Data
+text %>%
+  substr(start=1, stop=1000) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 1000 characters of of the example text.")  %>%
+  flextable::border_outer()
+```
+OK to here on 14 Nov=======================
+
+\#**Data Preparation**
+
+```{r skwic5, message=F, warning=F}
+text <- txtRaw 
+  text %>%
+  # collapse lines into a single  text
+  paste0(collapse = " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish()   
+  # %>%
+  # remove everything before "CHAPTER I."
+  # stringr::str_remove(".*CHAPTER I\\.")
+```
+
+The entire content of Terry Bouricius' \*\* is now combined into a
+single character object and we can begin with generating concordances
+(KWICs).
+
+## Generating Basic KWICs {.numbered}
+
+#Now, extracting concordances becomes straightforward with the `kwic`
+function from the `quanteda` package. This function is designed to
+enable the extraction of keyword-in-context (KWIC) displays, a common
+format for displaying #concordance lines.
+
+To prepare the text for concordance extraction, we first need to
+tokenize it, which involves splitting it into individual words or
+tokens. Additionally, we specify the `phrase` argument in the `kwic`
+function, allowing us to extract phrases consisting of more than one
+token, such as "campaign finance".
+
+The `kwic` function primarily requires two arguments: the tokenized text
+(`x`) and the search pattern (`pattern`). Additionally, it offers
+flexibility by allowing users to specify the context window, determining
+the number of words or elements displayed to the left and right of the
+nodeword. We delve deeper into customizing this context window later on.
+
+```{r basekwic1, message=F, warning=F}
+# pattern was "Alice"
+patn <- "campaign finance" 
+mykwic <- quanteda::kwic(
+  # define and tokenise text
+  quanteda::tokens(text),
+  # define search pattern and add the phrase function
+  pattern = phrase(patn)) %>%
+  # convert it into a data frame
+  as.data.frame()
+```
+
+
+## Loading and Processing Text {.numbered}
+
+#For this tutorial, we will use Lewis Carroll's classic novel *Alice's
+Adventures in Wonderland* as our primary text data-set. This whimsical
+tale follows the adventures of Alice as she navigates a fantastical
+world filled with peculiar characters and surreal landscapes.
+
+
+```{r skwic6, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+#txtRaw %>%
+mykwic %>%
+  # as.data.frame() %>%
+  dplyr::filter(.  != "") %>%
+  head(25) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 25 non-empty lines of the example text.")  %>%
+  flextable::border_outer()
+```
+
+
+# Inspect 'text' Data
+
+```{r skwic7, echo = F, message= F, warning= F}
+# inspect data
+text %>%
+  substr(start=1, stop=1000) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 1000 characters of of the example text.")  %>%
+  flextable::border_outer()
+```
+
+The entire content of Bouricus text(s) is now combined into a single
+character object and we can begin with generating concordances (KWICs).
+
+## Generating Basic KWICs {.numbered}
+
+Now, extracting concordances becomes straightforward with the `kwic`
+function from the `quanteda` package. This function is designed to
+enable the extraction of keyword-in-context (KWIC) displays, a common
+format for displaying concordance lines.
+
+To prepare the text for concordance extraction, we first need to
+tokenize it, which involves splitting it into individual words or
+tokens. Additionally, we specify the `phrase` argument in the `kwic`
+function, allowing us to extract phrases consisting of more than one
+token, such as "campaign finance" or "systemic corruption".
+
+The `kwic` function primarily requires two arguments: the tokenized text
+(`x`) and the search pattern (`pattern`). Additionally, it offers
+flexibility by allowing users to specify the context window, determining
+the number of words or elements displayed to the left and right of the
+nodeword. We delve deeper into customizing this context window later on.
+
+# Define and tokenize text text <- c("Your text data goes here") # Replace this with your actual text data # Define search pattern and add the phrase function mykwic <- quanteda::kwic( tokens(text), pattern = phrase("campaign finance") ) # Convert it into a data frame mykwic_df <- as.data.frame(mykwic)
+
+```{r basekwic2, message=F, warning=F}
+# Define and tokenize text 
+text <- c(txtRaw) # Replace this with your actual text data 
+# Define search pattern and add the phrase function mykwic 
+require(quanteda)
+b_tokes <- quanteda::kwic( tokens(text), pattern = phrase("campaign") ) 
+# Convert it into a data frame 
+mykwic_df <- as.data.frame(b_tokes)
+
+  summary(b_tokes)
+  summary(mykwic_df)
+  nrow(b_tokes)
+  nrow(mykwic_df)
+```
+# OK so far on 22 Nov 2024
+
+```{r basekwic3, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+mykwic %>%
+  head() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for the nodeword Alice in our example text.")  %>%
+  flextable::border_outer()
+```
+
+#After extracting a concordance table, we can easily determine the
+frequency of the search term ("-------") using either the `nrow` or
+`length` functions. These functions provide the number of rows in a
+table (`nrow`) or the length of a vector (`length`).
+
+```{r basekwic4}
+nrow(mykwic)
+length(mykwic$keyword)
+```
+
+#The results indicate that there are `r length(mykwic$keyword)`
+instances of the search term ("-----"). Moreover, we can also explore
+how often different variants of the search term were found using the
+table function. While this may be particularly useful for searches
+involving various search terms (although less so in the present
+example).
+
+```{r basekwic5}
+table(mykwic$keyword)
+```
+
+#To gain a deeper understanding of how a word is used, it can be
+beneficial to extract more context. This can be achieved by adjusting
+the size of the context window. To do so, we simply specify the `window`
+argument of the `kwic` function. In the following example, we set the
+context window size to 10 words/elements, deviating from the default
+size of 5 words/elements.
+
+#```{r basekwic6, message=F, warning=F}
+```{r kwic-long, message=F, warning=F}
+mykwic_long <- quanteda::kwic(
+  # define text
+  quanteda::tokens(text),
+  # define search pattern
+  pattern = phrase("campaign"),
+  # define context window size
+  window = 10) %>%
+  # make it a data frame
+  as.data.frame()
+```
+
+#```{r skwic8b, echo=F, message= F, warning= F, class.source='klippy'}
+```{r kwic-long-inspect, message=F, warning=F}
+# inspect data
+mykwic_long %>%
+  head() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for the nodeword *---* in the example text with extended context (10 elements).")  %>%
+  flextable::border_outer()
+```
+2024-11-22 works to this point
+-----------------------------------------
+
+#1. Extract the first 10 concordances for the word *confused*.<br>
+
+```{r ex1-confused, class.source = NULL, eval = T}
+kwic_confused <- quanteda::kwic(x = quanteda::tokens(text), pattern = phrase("election"))
+# inspect
+kwic_confused %>%
+as.data.frame() %>%
+head(10)
+```
+
+# 2. How many instances are there of the word *funding*?<br>
+
+```{r ex1-funding, class.source = NULL, eval = T}
+quanteda::kwic(x = quanteda::tokens(text), pattern = phrase("funding")) %>%
+as.data.frame() %>%
+nrow()
+```
+
+# 3. Extract concordances for the word *PAC* and show the first 5
+
+# concordance lines.<br>
+
+```{r ex1-strange, eval = T}
+kwic_PAC <- quanteda::kwic(x = quanteda::tokens(text), pattern = phrase("PAC"))
+# inspect
+kwic_PAC %>%
+  as.data.frame() %>%
+  head(5)
+```
+
+\## Exporting KWICs {-}
+
+# To export or save a concordance table as an MS Excel spreadsheet, you can
+
+# utilize the `write_xlsx` function from the `writexl` package, as demonstrated
+
+# below. It's important to note that we employ the `here` function from the
+
+# `here` package to specify the location where we want to save the file. In
+
+# this instance, we save the file in the current working directory. If you're
+
+# working with Rproj files in RStudio, which is recommended, then the current
+
+# working directory corresponds to the directory or folder where your Rproj
+# file is located.
+
+```{r writ-xlsx, eval = F, warning = F, message = F}
+write_xlsx(mykwic, here::here("mykwic-Bour.xlsx"))
+
+write_xlsx(as.vector(aaa,  here("aaa-Bour.xlsx")))
+writeLines(aaa, here("aaa-Bour.txt"))
+```
+
+## Extracting Multi-Word Expressions {.numbered}
+
+#While extracting single words is a common practice, there are
+situations where you may need to extract more than just one word at a
+time. This can be particularly useful when you're interested in
+extracting phrases or multi-word expressions from your text data. To
+accomplish this, you simply need to specify that the pattern you are
+searching for is a phrase. This allows you to extract contiguous
+sequences of words that form meaningful units of text.
+
+```{r multikwic2.1, message= F, warning= F}
+# extract concordances for the phrase "poor alice" using the kwic function from the quanteda package
+kwic-campaign-finance <- quanteda::kwic(
+  # tokenizing the input text
+  quanteda::tokens(text),
+  # specifying the search pattern as the phrase "poor alice"
+  pattern = phrase("campaign finance") ) %>%
+  # converting the result to a data frame for easier manipulation
+  as.data.frame()
+
+```
+
+```{r multikwic2.2, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic-campaign-finance %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for the nodephrase *poor alice* in the example text.")  %>%
+  flextable::border_outer()
+```
+
+#In addition to exact words or phrases, there are situations where you
+may need to extract more or less fixed patterns from your text data.
+These patterns might allow for variations in spelling, punctuation, or
+formatting. To search for such flexible patterns, you need to
+incorporate regular expressions into your search pattern.
+
+#Regular expressions (regex) are powerful tools for pattern matching and
+text manipulation. They allow you to define flexible search patterns
+that can match a wide range of text variations. For example, you can use
+regex to find all instances of a word regardless of whether it's in
+lowercase or uppercase, or to identify patterns like dates, email
+addresses, or URLs.
+
+#To incorporate regular expressions into your search pattern, you can
+use functions like `grepl()` or `grep()` in base R, or `str_detect()`
+and \#`str_extract()` in the `stringr` package. These functions allow
+you to specify regex patterns to search for within your text data.
+
+#1. Extract the first 10 concordances for the phrase *the hatter*.<br>
+
+```{r ex2-hatter, class.source = NULL, eval = T}
+kwic_hatter <- quanteda::kwic(x = quanteda::tokens(text), pattern = phrase("proportional representation"))
+
+# inspect
+kwic_hatter %>%
+  as.data.frame() %>%
+  head(10)
+```
+
+2.  How many instances are there of the phrase *the hatter*?<br>
+
+```{r ex2_2, class.source = NULL, eval = T}
+kwic_hatter %>%
+as.data.fr                                           name() %>%
+nrow()
+```
+
+3.  Extract concordances for the phrase *funding* and show the first 5
+
+# concordance lines.<br>
+
+```{r  ex2_3, class.source = NULL, eval = T}
+kwic_thecat <- quanteda::kwic(x = quanteda::tokens(text), pattern = phrase("funding"))
+# inspect
+kwic_thecat %>%
+as.data.frame() %>%
+head(5)
+```
+
+++++++++++++++================
+
+```{r endfile, echo = F}
+
+#Concordancing Using Regular Expressions
+
+# Regular expressions provide a powerful means of searching for abstract
+
+# patterns within text data, offering unparalleled flexibility beyond concrete
+
+# words or phrases. Often abbreviated as *regex* or *regexp*, a regular
+
+# expression is a special sequence of characters that describe a pattern to be
+
+# matched in a text.
+
+symbols1 <- c(fixed("?"), fixed("*"), fixed("+"), "{n}", "{n,}", "{n,m}")
+explanation1 <- c("The preceding item is optional and will be matched at most once", "The preceding item will be matched zero or more times", "The preceding item will be matched one or more times", "The preceding item is matched exactly n times", "The preceding item is matched n or more times", "The preceding item is matched at least n times, but not more than m times")
+example1 <- c("walk[a-z]? = walk, walks",
+              "walk[a-z]* = walk, walks, walked, walking",
+              "walk[a-z]+ = walks, walked, walking",
+              "walk[a-z]{2} = walked",
+              "walk[a-z]{2,} = walked, walking",
+              "walk[a-z]{2,3} = walked, walking")
+df_regex <- data.frame(symbols1, explanation1, example1)
+colnames(df_regex) <- c("RegEx Symbol/Sequence", "Explanation", "Example")
+```
+
+```{r regex02, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+df_regex %>%
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Regular expressions that stand for individual symbols and determine frequencies.")  %>%
+  flextable::border_outer()
+```
+
+The regular expressions below show the second type of regular
+expressions, i.e. regular expressions that stand for classes of symbols.
+
+```{r regex03, echo=F, eval = T, message= F, warning= F}
+symbols2 <- c("[ab]", "[AB]", "[12]", "[:digit:]", "[:lower:]", "[:upper:]", "[:alpha:]", "[:alnum:]", "[:punct:]", "[:graph:]", "[:blank:]", "[:space:]", "[:print:]")
+explanations2 <- 
+  c("lower case a and b",
+  "upper case a and b",
+  "digits 1 and 2",
+  "digits: 0 1 2 3 4 5 6 7 8 9",
+  "lower case characters: a–z",
+  "upper case characters: A–Z",
+  "alphabetic characters: a–z and A–Z",
+  "digits and alphabetic characters",
+  "punctuation characters: . , ; etc.",
+  "graphical characters: [:alnum:] and [:punct:]",
+  "blank characters: Space and tab",
+  "space characters: Space, tab, newline, and other space characters",
+  "printable characters: [:alnum:], [:punct:] and [:space:]")
+df_regex <- data.frame(symbols2, explanations2)
+colnames(df_regex) <- c("RegEx Symbol/Sequence", "Explanation")
+```
+
+```{r regex04, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+df_regex %>%
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Regular expressions that stand for classes of symbols.")  %>%
+  flextable::border_outer()
+  # works 2024-11-22
+```
+
+#The regular expressions that denote classes of symbols are enclosed in
+`[]` and `:`. The last type of regular expressions, i.e. regular
+expressions that stand for structural properties are shown below.
+
+```{r regex05, echo=F, eval = T, message= F, warning= F}
+symbols3 <- c(fixed("\\\\w"), fixed("\\\\W"), fixed("\\\\s"), fixed("\\\\S"), fixed("\\\\d"), fixed("\\\\D"), fixed("\\\\b"), fixed("\\\\B"), fixed("<"), fixed(">"), fixed("^"), fixed("$"))
+explanations3 <- 
+  c("Word characters: [[:alnum:]_]",
+  "No word characters: [^[:alnum:]_]",
+  "Space characters: [[:blank:]]",
+  "No space characters: [^[:blank:]]",
+  "Digits: [[:digit:]]",
+  "No digits: [^[:digit:]]",
+  "Word edge",
+  "No word edge",
+  "Word beginning",
+  "Word end",
+  "Beginning of a string",
+  "End of a string")
+df_regex <- data.frame(symbols3, explanations3)
+colnames(df_regex) <- c("RegEx Symbol/Sequence", "Explanation")
+```
+
+```{r regex06, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+df_regex %>%
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Regular expressions that stand for structural properties.")  %>%
+  flextable::border_outer()
+```
+
+#To incorporate regular expressions into your KWIC searches, you include
+them in your search pattern and set the `valuetype` argument to
+`"regex"`. This allows you to specify complex search patterns that go
+beyond exact word matches.
+
+#For example, consider the search pattern `"\\balic.*|\\bhatt.*"`. In
+this pattern:
+
+# - `\\b` indicates a word boundary, ensuring that the subsequent characters are at the beginning of a word.
+
+# - `alic.*` matches any sequence of characters (`.*`) that begins with `alic`.
+
+# - `hatt.*` matches any sequence of characters that begins with `hatt`.
+
+# - The `|` operator functions as an OR operator, allowing the pattern to match either `alic.*` or `hatt.*`.
+
+#As a result, this search pattern retrieves elements that contain `alic`
+or \#`hatt` followed by any characters, but only where `alic` and `hatt`
+are the first letters of a word. Consequently, words like "malice" or
+"shatter" would not be retrieved.
+
+#=====================================
+Below: search for regex patterns
+#=====================================
+#patterns <- c("\\bcampaign.*|\\bfinanc.*")
+
+```{r rkwic6.1, message= F, warning= F}
+# define search patterns
+keywords <- c("\\bChapter.*|\\bfunds.*|\\bfraud.*|\\bdonat.*|\\bfunds.*|\\bfunding.*|\\bfinanc.*|\\bmoney.*|\\bbrib.*|\\belection.*|\\bcampaign.*|\\bcontribution.*|\\bexpens.*|\\bexcessiv.*|\\bsystem.*")
+
+kwic_regex <- quanteda::kwic(
+  # define text as the tokens object: b_tokes
+  quanteda::tokens(text),
+  # define search pattern
+  keywords,
+  # define valuetype
+  valuetype = "regex") %>%
+  # make it a data frame
+  as.data.frame()
+```  
+
+```{r writ-xlsx2, eval = F, warning = F, message = F}
+write_xlsx(kwic_regex, ("kw_regex-Bour.xlsx"))
+
+# 2024-11-23 writes the file to ../Bour.
+
+```
+
+```{r rkwic6.2, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_regex %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for the regular expression \\balic.* and \\bhatt.*.")  %>%
+  flextable::border_outer()
+```
+
+1.  Extract the first 10 concordances for words containing *exu*.<br>
+
+```{r ex3_1, class.source = NULL, eval = T}
+    kwic_exu <- quanteda::kwic(x = quanteda::tokens(text), pattern = ".*exu.*", valuetype = "regex")
+    # inspect
+    kwic_exu %>%
+      as.data.frame() %>%
+      head(10)
+```
+
+2.  How many instances are there of words beginning with *pit*?<br>
+
+```{r ex3_2, class.source = NULL, eval = T}
+quanteda::kwic(x = quanteda::tokens(text), pattern = "\\bpit.*", valuetype = "regex") %>%
+  as.data.frame() %>%
+  nrow()
+```
+
+3.  Extract concordances for words ending with *ption* and show the
+    first 5 concordance lines.<br>
+
+```{r ex3_3, class.source = NULL, eval = T}
+quanteda::kwic(x = quanteda::tokens(text), pattern = "ption\\b", valuetype = "regex")  %>%
+  as.data.frame() %>%
+  head(5)
+```
+
+-   Concordancing and Piping{-}\*
+
+# Quite often, we want to retrieve patterns only if they occur in a specific
+
+# context. For instance, we might be interested in instances of "alice", but
+
+# only if the preceding word is "poor" or "little". While such conditional
+
+# concordances could be extracted using regular expressions, they are more
+
+# easily retrieved by piping.
+
+#Piping is achieved using the `%>%` function from the `dplyr` package,
+and the piping sequence can be interpreted as "and then". We can then
+filter those concordances that contain "alice" using the `filter`
+function from the `dplyr` package. Note that the `$` symbol stands for
+the end of a string, so "poor\$" signifies that "poor" is the last
+element in the string that precedes the nodeword.
+
+```{r pipekwic7.1, echo=T, eval = T, message= F, warning= F}
+# extract KWIC concordances
+quanteda::kwic(
+  # input  tokenized text
+  x = quanteda::tokens(text),
+  # define search pattern ("alice")
+  pattern = "alice"
+  # pipe (and then)
+) %>%
+  # convert result to data frame
+  as.data.frame() %>%
+  # filter concordances with "poor" or "little" preceding "alice"
+  # save result in object called "kwic_pipe"
+  dplyr::filter(stringr::str_detect(pre, "poor$|little$")) -> kwic_pipe
+```
+
+```{r pipekwic7.2, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_pipe %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for instances of *alice* that are preceeded by *poor* or *little*.")  %>%
+  flextable::border_outer()
+```
+
+In this code:
+
+-   `quanteda::kwic`: This function extracts KWIC concordances from the
+    input text.
+-   `quanteda::tokens(text)`: The input text is tokenized using the
+    `tokens` function from the `quanteda` package.
+-   `pattern = "alice"`: Specifies the search pattern as "alice".
+-   `%>%`: The pipe operator (`%>%`) chains together multiple
+    operations, passing the result of one operation as the input to the
+    next.
+-   `as.data.frame()`: Converts the resulting concordance object into a
+    data frame.
+-   `dplyr::filter(...)`: Filters the concordances based on the
+    specified condition, which is whether "poor" or "little" precedes
+    "alice".
+
+#Piping is an indispensable tool in R, commonly used across various data
+science domains, including text processing. This powerful function,
+denoted by `%>%`, allows for a more streamlined and readable workflow by
+chaining together multiple operations in a sequential manner.
+
+#Instead of nesting functions or creating intermediate variables, piping
+allows to take an easy-to-understand and more intuitive approach to data
+manipulation and analysis. With piping, each operation is performed "and
+then" the next, leading to code that is easier to understand and
+maintain.
+
+#While piping is frequently used in the context of text processing, its
+#versatility extends far beyond. In data wrangling, modeling,
+visualization, and beyond, piping offers a concise and elegant solution
+for composing complex workflows.
+
+#By leveraging piping, R users can enhance their productivity and
+efficiency, making their code more expressive and succinct while
+maintaining clarity and readability. It's a fundamental tool in the
+toolkit of every R programmer, empowering them to tackle data science
+challenges with confidence and ease.
+
+## Ordering and Arranging KWICs {.numbered}
+
+#When examining concordances, it's often beneficial to reorder them
+based on their context rather than the order in which they appeared in
+the text or texts. This allows for a more organized and structured
+analysis of the data. To reorder concordances, we can utilize the
+`arrange` function from the `dplyr` package, which takes the column
+according to which we want to rearrange the data as its main argument.
+
+\*\* Ordering Alphabetically {-}
+
+#In the example below, we extract all instances of "alice" and then
+arrange the instances according to the content of the post column in
+alphabetical order.
+
+```{r orderkwic2.1, echo=T, eval = T, message= F, warning= F}
+# extract KWIC concordances
+quanteda::kwic(
+  # input  tokenized text
+  x = quanteda::tokens(text),
+  # define search pattern ("alice")
+  pattern = "alice"
+  # end function and pipe (and then)
+) %>%
+  # convert result to data frame
+  as.data.frame() %>%
+
+   # arrange concordances based on the content of the "post" column
+  # save result in object called "kwic_ordered"
+  dplyr::arrange(post) -> kwic_ordered
+```
+
+```{r orderkwic2.2, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_ordered %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 re-ordered concordances for instances of alice.")  %>%
+  flextable::border_outer()
+```
+
+### Ordering by Co-Occurrence Frequency {.numbered}
+
+#Arranging concordances based on alphabetical properties may not always
+be the most informative approach. A more insightful option is to arrange
+concordances according to the frequency of co-occurring terms or
+collocates. This allows us to identify the most common words that appear
+alongside our search term, providing valuable insights into its usage
+patterns.
+
+To accomplish this, we need to follow these steps:
+
+```{r arrange_kwic, echo=T, eval = T, message= F, warning= F}
+quanteda::kwic(
+  # define text
+  x = quanteda::tokens(text),
+  # define search pattern
+  pattern = "alice") %>%
+  # make it a data frame
+  as.data.frame() %>%
+  # extract word following the nodeword
+  dplyr::mutate(post1 = str_remove_all(post, " .*")) %>%
+  # group following words
+  dplyr::group_by(post1) %>%
+  # extract frequencies of the following words
+  dplyr::mutate(post1_freq = n()) %>%
+  # arrange/order by the frequency of the following word
+  dplyr::arrange(-post1_freq) -> kwic_ordered_coll
+```
+
+```{r orderkwic4.1, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_ordered_coll %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 re-ordered concordances.")  %>%
+  flextable::border_outer()
+```
+
+# - `mutate`: This function from the `dplyr` package creates a new column in the data frame.
+
+# - `str_remove_all`: This function from the `stringr` package removes all occurrences of a specified pattern from a character string.
+
+# - `group_by`: This function from the `dplyr` package groups the data by a specified variable.
+
+# - `n()`: This function from the `dplyr` package calculates the number of observations in each group.
+
+# - `arrange`: This function from the `dplyr` package arranges the rows of a data frame based on the values of one or more columns.
+
+#We add more columns according to which we could arrange the concordance
+#following the same schema. For example, we could add another column
+that represented the frequency of words that immediately preceded the
+search term and then arrange according to this column.
+
+## Ordering by Multiple Co-Occurrence Frequencies {.numbered}
+
+#In this section, we extract the three words preceding and following the
+#nodeword "alice" from the concordance data and organize the results by
+the frequencies of the following words (you can also order by the
+preceding words which is why we also extract them).
+
+#We begin by iterating through each row of the concordance data using
+\#`rowwise()`. Then, we extract the three words following the nodeword
+("alice") and the three words preceding it from the `post` and `pre`
+columns, respectively. These words are split using the `strsplit`
+function and stored in separate columns (`post1`, `post2`, `post3`,
+`pre1`, `pre2`, `pre3`).
+
+#Next, we group the data by each of the following words (`post1`,
+`post2`, \#`post3`, `pre1`, `pre2`, `pre3`) and calculate the frequency
+of each word using the `n()` function within each group. This allows us
+to determine how often each word occurs in relation to the nodeword
+"alice".
+
+#Finally, we arrange the concordances based on the frequencies of the
+following words (`post1`, `post2`, `post3`) in descending order using
+the `arrange()` function, storing the result in the `mykwic_following`
+data frame.
+
+```{r orderkwic3.1}
+mykwic %>%
+  dplyr::rowwise() %>%  # Row-wise operation for each entry
+  # Extract words preceding and following the node word
+  # Extracting the first word following the node word
+  dplyr::mutate(post1 = unlist(strsplit(post, " "))[1],
+  # Extracting the second word following the node word
+  post2 = unlist(strsplit(post, " "))[2],
+  # Extracting the third word following the node word
+  post3 = unlist(strsplit(post, " "))[3],
+  # Extracting the last word preceding the node word
+  pre1 = unlist(strsplit(pre, " "))[length(unlist(strsplit(pre, " ")))],
+  # Extracting the second-to-last word preceding the node word
+  pre2 = unlist(strsplit(pre, " "))[length(unlist(strsplit(pre, " ")))-1],
+ # Extracting the third-to-last word preceding the node word
+ pre3 = unlist(strsplit(pre, " "))[length(unlist(strsplit(pre, " ")))-2]) %>%
+  # Extract frequencies of the words around the node word
+  # Grouping by the first word following the node word and counting its frequency
+  dplyr::group_by(post1) %>% dplyr::mutate(npost1 = n()) %>%
+  # Grouping by the second word following the node word and counting its frequency
+  dplyr::group_by(post2) %>% dplyr::mutate(npost2 = n()) %>%
+  # Grouping by the third word following the node word and counting its frequency
+  dplyr::group_by(post3) %>% dplyr::mutate(npost3 = n()) %>%
+  # Grouping by the last word preceding the node word and counting its frequency
+  dplyr::group_by(pre1) %>% dplyr::mutate(npre1 = n()) %>%
+  # Grouping by the second-to-last word preceding the node word and counting its frequency
+  dplyr::group_by(pre2) %>% dplyr::mutate(npre2 = n()) %>%
+  # Grouping by the third-to-last word preceding the node word and counting its frequency
+  dplyr::group_by(pre3) %>% dplyr::mutate(npre3 = n()) %>%
+  # Arranging the results
+  # Arranging in descending order of frequencies of words following the node word
+  dplyr::arrange(-npost1, -npost2, -npost3) -> mykwic_following
+```
+
+```{r orderkwic4.3, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+mykwic_following %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of re-ordered concordances.")  %>%
+  flextable::border_outer()
+```
+
+The updated concordance now presents the arrangement based on the
+frequency of words following the node word. This means that the words
+occurring most frequently immediately after the keyword "alice" are
+listed first, followed by less frequent ones.
+
+# Concordances from Transcriptions {.numbered}
+
+Since many analyses rely on transcripts as their main data source, and
+transcripts often require additional processing due to their specific
+features, we will now demonstrate concordancing using transcripts. To
+begin, we will load five example transcripts representing the first five
+files from the Irish component of the [International Corpus of
+English](https://www.ice-corpora.uzh.ch/en.html)[\^1]. These transcripts
+will serve as our data-set for conducting concordance analysis.
+
+We first load these files so that we can process them and extract KWICs.
+To load the files, the code below dynamically generates URLs for a
+series of text files, then reads the content of each file into R,
+storing the text data in the transcripts object. This is a common
+procedure when working with multiple text files or when the file names
+follow a consistent pattern.
+
+```{r trans1, echo=T, eval = T, message= F, warning= F}
+# define corpus files
+files <- paste("https://slcladal.github.io/data/ICEIrelandSample/S1A-00", 1:5, ".txt", sep = "")
+# load corpus files
+transcripts <- sapply(files, function(x){
+  x <- readLines(x)
+  })
+```
+
+```{r trans2, echo = F, message= F, warning= F}
+# inspect data
+transcripts[[1]][1:10] %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 utterances in the sample transcripts.")  %>%
+  flextable::border_outer()
+```
+
+#The first ten lines shown above let us know that, after the header
+(`<S1A-001 Riding>`) and the symbol which indicates the start of the
+transcript (`<I>`), each utterance is preceded by a sequence which
+indicates the section, file, and speaker (e.g. `<S1A-001$A>`). The first
+utterance is thus uttered by speaker \#`A` in file `001` of section
+`S1A`. In addition, there are several sequences that provide
+meta-linguistic information which indicate the beginning of a speech
+unit (`<#>`), pauses (`<,>`), and laughter (`<&> laughter </&>`).
+
+#To perform the concordancing, we need to change the format of the
+transcripts because the `kwic` function only works on character, corpus,
+tokens object- in their present form, the transcripts represent a list
+which contains vectors of strings. To change the format, we collapse the
+individual utterances into a single character vector for each
+transcript.
+
+```{r trans3, echo=T, eval = T, message= F, warning= F}
+transcripts_collapsed <- sapply(files, function(x){
+  # read-in text
+  x <- readLines(x)
+  # paste all lines together
+  x <- paste0(x, collapse = " ")
+  # remove superfluous white spaces
+  x <- str_squish(x)
+})
+```
+
+```{r trans4, echo = F, message= F, warning= F}
+# inspect data
+transcripts_collapsed %>%
+    substr(start=1, stop=500) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 500 characters of the collapsed sample transcripts.")  %>%
+  flextable::border_outer()
+```
+
+#We now move on to extracting concordances. We begin by splitting the
+text simply by white space. This ensures that tags and markup remain
+intact, preventing accidental splitting. Additionally, we extend the
+context surrounding our target word or phrase. While the default is five
+tokens before and after the keyword, we opt to widen this context to 10
+tokens. Furthermore, for improved organization and readability, we
+refine the file names. Instead of using the full path, we extract only
+the name of the text. This simplifies the presentation of results and
+enhances clarity when navigating through the corpus.
+
+```{r trans5, echo=T, eval = T, message= F, warning= F}
+kwic_trans <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"),
+  # define search pattern
+  pattern = phrase("you know"),
+  # extend context
+  window = 10) %>%
+  # make it a data frame
+  as.data.frame() %>%
+  # clean doc names / file names / text names
+  dplyr::mutate(docname = str_replace_all(docname, ".*/(.*?).txt", "\\1"))
+
+```
+
+```{r trans6, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_trans %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for you know in three example transcripts.")  %>%
+  flextable::border_outer()
+```
+
+## Custom Concordances {.numbered}
+
+As R represents a fully-fledged programming environment, we can, of
+course, also write our own, customized concordance function. The code
+below shows how you could go about doing so. Note, however, that this
+function only works if you enter more than a single file.
+
+```{r customkwic1, message=F, warning=F}
+mykwic <- function(txts, pattern, context) {
+  # activate packages
+  require(stringr)
+  # list files
+  txts <- txts[stringr::str_detect(txts, pattern)]
+  conc <- sapply(txts, function(x) {
+    # determine length of text
+        lngth <- as.vector(unlist(nchar(x)))
+    # determine position of hits
+    idx <- str_locate_all(x, pattern)
+    idx <- idx[[1]]
+    ifelse(nrow(idx) >= 1, idx <- idx, return(NA))
+    # define start position of hit
+    token.start <- idx[,1]
+    # define end position of hit
+    token.end <- idx[,2]
+    # define start position of preceding context
+    pre.start <- ifelse(token.start-context < 1, 1, token.start-context)
+    # define end position of preceding context
+    pre.end <- token.start-1
+    # define start position of subsequent context
+    post.start <- token.end+1
+    # define end position of subsequent context
+    post.end <- ifelse(token.end+context > lngth, lngth, token.end+context)
+    # extract the texts defined by the positions
+    PreceedingContext <- substring(x, pre.start, pre.end)
+    Token <- substring(x, token.start, token.end)
+    SubsequentContext <- substring(x, post.start, post.end)
+    Id <- 1:length(Token)
+    conc <- cbind(Id, PreceedingContext, Token, SubsequentContext)
+    # return concordance
+    return(conc)
+    })
+  concdf <- do.call(rbind, conc) %>%
+    as.data.frame()
+  return(concdf)
+}
+```
+
+We can now try if this function works by searching for the sequence *you
+know* in the transcripts that we have loaded earlier. One difference
+between the \#`kwic` function provided by the `quanteda` package and the
+customized concordance function used here is that the `kwic` function
+uses the number of words to define the context window, while the
+`mykwic` function uses the number of characters or symbols instead
+(which is why we use a notably higher number to define the context window).
+
+```{r customkwic2, message=F, warning=F}
+kwic_youknow <- mykwic(transcripts_collapsed, "you know", 50)
+```
+
+```{r customkwic3, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic_youknow %>%
+  as.data.frame() %>%
+  head() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 6 concordances for *you know* extracted using the mykwic function.")  %>%
+  flextable::border_outer() 
+```
+
+As this concordance function only works for more than one text, we split
+the text into chapters and assign each chapter a name.
+
+
+```{r customkwic4, message= F, warning= F}
+# read in text
+text_split <- text %>%
+  stringr::str_squish() %>%
+  stringr::str_split("Leave a comment") %>%
+  unlist()
+text_split <- text_split[which(nchar(text_split) > 2000)]
+# add names
+names(text_split) <- paste0(text, length(text_split))
+# inspect data
+nchar(text_split)
+```
+
+Now that we have named elements, we can search for the pattern *poor
+alice*. We also need to clean the concordance as some sections do not
+contain any instances of the search pattern. To clean the data, we
+select only the columns `File`, `PreceedingContext`, `Token`, and `SubsequentContext` and then remove all rows where information is missing.
+
+```{r customkwic5, message= F, warning= F}
+kwic-dirty <- mykwic(text_split, "dirty tricks", 50)
+```
+
+```{r customkwic6, echo=F, message= F, warning= F, class.source='klippy'}
+# inspect data
+kwic-dirty %>%
+  as.data.frame() %>%
+  head() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 6 concordances of *kwic-dirty* extracted using the mykwic function.")  %>%
+  flextable::border_outer()
+```
+
+You can go ahead and modify the customized concordance function to suit
+your needs.
+
+##Citation & Session Info {.numbered}
+
+#Schweinberger, Martin. 2024. *Concordancing with R*. Brisbane: The
+Language Technology and Data Analysis Laboratory (LADAL). url:
+\#<https://ladal.edu.au/kwics.html> (Version 2024.05.07).
+
+@manual{schweinberger2024kwics, \#' author = {Schweinberger, Martin},
+\#' title = {Concordancing with R}, \#' note =
+{<https://ladal.edu.au/kwics.html>}, \#' year = {2024}, \#' organization
+= {The Language Technology and Data Analysis Laboratory (LADAL)}, \#'
+address = {Brisbane}, \#' edition = {2024.05.07} \#' } \#'\`
+
+```{r fin}
+sessionInfo() 
+```
+
+-----------------------------------------------------
+
+# [Back to top](#introduction)
+
+[Back to HOME [LADAL] (<https://ladal.edu.au>)
+
+------------------------------------------------------------------------
+
+# References {.numbered}
+
+\#[\^1]: This data is freely available after registration. To get access
+to the data represented in the Irish Component of the International
+Corpus of English \#(or any other component), you or your institution
+will need a valid licence. You need to send your request from an
+academic edu e-mail to proof your educational status. To get an academic
+licence with download access please fill in [the licence form (PDF,
+82KB)]
+(<https://www.ice-corpora.uzh.ch/dam/jcr:7ae594b2-ee97-4935-8022-7d2d91b60be4/ICElicence_UZH.pdf>)
+and send it to `ice@es.uzh.ch`. You should get the credentials for
+downloading
+[here](https://www.ice-corpora.uzh.ch/en/access/corpus-download.html)
+and unpacking the corpora within about 10 working days.
+
+=========
+
+![Save environment files to reload w/o 'running' the code that made
+them. see URL for details and reading them back in.]
+<https://stackoverflow.com/questions/34029611/how-to-use-objects-from-global-environment-in-rstudio-markdown>
+
+```{r save-env-files}
+save.image("D:/dox/projects/Bour/glob-env-B-kwic-code-03.RData")
+```
+
+\`\`\`
+
+```{r ladalimge, echo=F, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+```
+
+Click [**here**](https://ladal.edu.au/content/kwics.Rmd)[^1] to download
+the **entire R Notebook** for this
+tutorial.![Binder](https://mybinder.org/badge_logo.svg)](<https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkwics_cb.ipynb%26branch%3Dmain>)
+Click [**here**]
+(<https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkwics_cb.ipynb%26branch%3Dmain>)
+to open a Jupyter notebook that allows you to follow this tutorial
+interactively. This means that you can execute, change, and edit the
+code used in this tutorial to help you better understand how the code
+shown here works (make sure you run all code chunks in the order in
+which they appear to avoid running into errors).
+
+[^1]: If you want to render the R Notebook on your machine, i.e.
+    knitting the document to html or a pdf, you need to make sure that
+    you have R and RStudio installed and you also need to download the
+    [**bibliography file**]
+    (<https://slcladal.github.io/content/bibliography.bib>) and store it
+    in the same folder where you store the Rmd file.
+
+```{r uq1, echo=F, fig.cap="", message=F, warning=F, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+```{r tokens}
+https://libguides.lib.fit.edu/c.php?g=968160&p=7016724
+# has several downloads related to tokenizing and to reading sets of files into one object.
+```
+
+
+```{r show-code, ref.label=knitr::all_labels(), echo = TRUE, eval=FALSE}
+# https://stackoverflow.com/questions/35512308/r-markdown-a-concise-way-to-print-all-code-snippets-used-in-the-document
+```
+
+EOF
+
